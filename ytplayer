@@ -1,0 +1,66 @@
+// ==UserScript==
+// @name         Forum YouTube Audio Player with Input
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Play YouTube audio from input link
+// @match        http://www.knieje.fora.pl/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Load YouTube API
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    // Create player container (hidden video)
+    const playerContainer = document.createElement("div");
+    playerContainer.id = "yt-player";
+    playerContainer.style.width = "0";
+    playerContainer.style.height = "0";
+    playerContainer.style.overflow = "hidden";
+    document.body.insertBefore(playerContainer, document.body.firstChild);
+
+    // Create controls
+    const controls = document.createElement("div");
+    controls.innerHTML = `
+        <input id="yt-url" type="text" placeholder="Paste YouTube link or ID" style="width:250px; padding:5px;">
+        <button id="yt-load">▶ Play</button>
+        <button id="yt-pause">⏸ Pause</button>
+    `;
+    controls.style.textAlign = "center";
+    controls.style.margin = "10px";
+    document.body.insertBefore(controls, document.body.firstChild);
+
+    let player;
+    window.onYouTubeIframeAPIReady = function() {
+        player = new YT.Player('yt-player', {
+            height: '0',
+            width: '0',
+            videoId: '', // initially empty
+            events: {}
+        });
+    };
+
+    // Extract YouTube video ID from link or ID
+    function getYouTubeID(url) {
+        const match = url.match(/(?:v=|youtu\.be\/|embed\/)([^&?/]+)/);
+        return match ? match[1] : url; // if full link -> extract, else assume raw ID
+    }
+
+    // Handle button clicks
+    document.addEventListener("click", e => {
+        if (e.target.id === "yt-load") {
+            const input = document.getElementById("yt-url").value.trim();
+            if (input) {
+                const videoId = getYouTubeID(input);
+                player.loadVideoById(videoId);
+            }
+        }
+        if (e.target.id === "yt-pause") {
+            player.pauseVideo();
+        }
+    });
+})();

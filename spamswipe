@@ -1,0 +1,24 @@
+// ==UserScript==
+// @name         Fora.pl – remove ad rows
+// @namespace    tm-fora-ads-tr
+// @version      1.0
+// @match        http*://*.fora.pl/*
+// @run-at       document-end
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  function nukeAdRows() {
+    document.querySelectorAll('table.forumline tr').forEach(tr => {
+      const td = tr.querySelector('td.row2[colspan="6"]');
+      if (td && /op02-Fora\.pl_S\d|adsbygoogle|googlesyndication/i.test(td.innerHTML)) {
+        tr.remove();
+      }
+    });
+  }
+
+  nukeAdRows();
+  const obs = new MutationObserver(nukeAdRows);
+  obs.observe(document.body, { childList: true, subtree: true });
+})();

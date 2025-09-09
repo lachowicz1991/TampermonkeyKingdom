@@ -1,0 +1,86 @@
+// ==UserScript==
+// @name         Fora.pl – spam filter
+// @match        http*://*.fora.pl/*
+// @match        http*://fora.pl/*
+// @match        http*://*.knieje.fora.pl/*
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+(function () {
+  'use strict';
+
+  const RE_AD_AUTHOR = /^reklama$/i;
+
+  function isAdTbody(tb) {
+    // true if author name is exactly "Reklama"
+    const nameB = tb.querySelector('.name b');
+    if (nameB && RE_AD_AUTHOR.test(nameB.textContent.trim())) return true;
+
+    // also treat any tbody with id starting with optS- as ad (forum’s ad “posts”)
+    if (tb.id && /^optS-\d+$/i.test(tb.id)) return true;
+
+    // or subject explicitly says REKLAMA
+    const subj = tb.querySelector('.postdetails');
+    if (subj && /temat\s+postu:\s*reklama/i.test(subj.textContent)) return true;
+
+    // and special class sometimes added to ad rows
+    if (tb.classList.contains('opt-block-s')) return true;
+
+    return false;
+  }
+
+  function removeAdBlocks(root = document) {
+    // Remove ad “post” tbodies only
+    root.querySelectorAll('tbody').forEach(tb => {
+      if (isAdTbody(tb)) {
+        console.log('[TM] Remove ad tbody:', tb.id || tb);
+        tb.remove();
+      }
+    });
+
+    // Remove AdSense containers and any placeholders
+    root.querySelectorAll('ins.adsbygoogle, .adsbygoogle').forEach(n => {
+      n.remove();
+    });
+
+    // Remove obvious googlesyndication script tags
+    root.querySelectorAll('script[src*="googlesyndication.com"]').forEach(s => s.remove());
+  }
+
+  // Defensive CSS (hides anything that slips through before JS runs)
+  const style = document.createElement('style');
+  style.textContent = `
+    tbody[id^="optS-"],
+    tbody.opt-block-s,
+    ins.adsbygoogle,
+    .adsbygoogle { display: none !important; }
+    /* Don't hide real posts */
+  `;
+  document.documentElement.appendChild(style);
+
+  // Run now
+  removeAdBlocks();
+
+  // Catch late/dynamic inserts (ads often inject after load)
+  const obs = new MutationObserver(muts => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (!(n instanceof HTMLElement)) continue;
+        if (
+          n.matches?.('tbody[id^="optS-"], tbody.opt-block-s, ins.adsbygoogle, .adsbygoogle') ||
+          n.querySelector?.('tbody[id^="optS-"], tbody.opt-block-s, ins.adsbygoogle, .adsbygoogle, .name b, .postdetails')
+        ) {
+          removeAdBlocks(document);
+        }
+      }
+    }
+  });
+  obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+
+  // Belt-and-suspenders: sweep a few times shortly after load
+  let sweeps = 0;
+  const iv = setInterval(() => {
+    removeAdBlocks();
+    if (++sweeps >= 6) clearInterval(iv);
+  }, 500);
+})();
